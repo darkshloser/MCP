@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  # MCP Server - Tool registry and execution
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "mcp_server.main"]
+    ports:
+      - "8001:8001"
+    environment:
+      - MCP_ENVIRONMENT=production
+      - MCP_LOG_LEVEL=INFO
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8001
+      - MCP_SERVER_REQUIRE_AUTH=false
+      - MCP_SERVER_ENABLE_AUDIT=true
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Orchestrator - AI Gateway
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "orchestrator.main"]
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_ENVIRONMENT=production
+      - MCP_LOG_LEVEL=INFO
+      - ORCHESTRATOR_HOST=0.0.0.0
+      - ORCHESTRATOR_PORT=8000
+      - ORCHESTRATOR_MCP_SERVER_URL=http://mcp-server:8001
+      - ORCHESTRATOR_SECRET_KEY=${ORCHESTRATOR_SECRET_KEY:-change-me}
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_API_BASE=${LLM_API_BASE:-}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4}
+      - LLM_DEPLOYMENT_NAME=${LLM_DEPLOYMENT_NAME:-gpt-4}
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend - Chat UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
+
+networks:
+  default:
+    name: mcp-network

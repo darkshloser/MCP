@@ -1,0 +1,19 @@
+# HR Domain Configuration
+
+name: hr
+description: Human Resources domain for employee and department management
+version: "1.0.0"
+enabled: true
+
+# Connection settings (for real HR system)
+# base_url: https://hr-api.internal/v1
+# auth_type: oauth2
+
+# Rate limiting
+rate_limit_rpm: 60
+timeout_seconds: 30
+
+# Feature flags
+features:
+  enable_updates: true
+  enable_bulk_operations: false

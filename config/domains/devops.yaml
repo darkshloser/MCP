@@ -1,0 +1,20 @@
+# DevOps Domain Configuration
+
+name: devops
+description: DevOps domain for Kubernetes operations and infrastructure management
+version: "1.0.0"
+enabled: true
+
+# Connection settings (for Kubernetes API)
+# base_url: kubectl  # CLI-based adapter
+# auth_type: kubeconfig
+
+# Rate limiting
+rate_limit_rpm: 30
+timeout_seconds: 60
+
+# Feature flags
+features:
+  enable_scaling: true
+  enable_restarts: true
+  enable_deployments: false  # Deployments require additional approval

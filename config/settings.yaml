@@ -1,0 +1,37 @@
+# MCP Platform Configuration
+
+environment: development
+debug: true
+log_level: INFO
+
+llm:
+  provider: mock  # Use mock for testing without API calls
+  model: gpt-4
+  temperature: 0.7
+  max_tokens: 4096
+  # For Azure OpenAI:
+  # provider: azure_openai
+  # api_key: ${LLM_API_KEY}
+  # api_base: ${LLM_API_BASE}
+  # api_version: "2024-02-15-preview"
+  # deployment_name: gpt-4
+
+mcp_server:
+  host: "0.0.0.0"
+  port: 8001
+  domains_path: config/domains
+  enable_audit: true
+  audit_log_path: logs/audit.log
+  require_auth: false
+  trusted_clients:
+    - orchestrator
+    - cli
+
+orchestrator:
+  host: "0.0.0.0"
+  port: 8000
+  mcp_server_url: http://localhost:8001
+  max_conversation_length: 50
+  conversation_ttl_minutes: 60
+  secret_key: change-me-in-production
+  token_expire_minutes: 60

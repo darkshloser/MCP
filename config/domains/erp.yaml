@@ -1,0 +1,20 @@
+# ERP Domain Configuration
+
+name: erp
+description: Enterprise Resource Planning domain for invoices and inventory
+version: "1.0.0"
+enabled: true
+
+# Connection settings (for real ERP system)
+# base_url: https://erp-api.internal/v2
+# auth_type: api_key
+
+# Rate limiting
+rate_limit_rpm: 120
+timeout_seconds: 45
+
+# Feature flags
+features:
+  enable_invoice_creation: true
+  enable_inventory_updates: true
+  enable_financial_reports: false
