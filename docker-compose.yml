@@ -1,6 +1,22 @@
 version: "3.8"
 
 services:
+  # Ollama - Local LLM runtime
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2:3b && wait"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
   # MCP Server - Tool registry and execution
   mcp-server:
     build:
@@ -41,15 +57,17 @@ services:
       - ORCHESTRATOR_PORT=8000
       - ORCHESTRATOR_MCP_SERVER_URL=http://mcp-server:8001
       - ORCHESTRATOR_SECRET_KEY=${ORCHESTRATOR_SECRET_KEY:-change-me}
-      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_API_BASE=${LLM_API_BASE:-}
-      - LLM_MODEL=${LLM_MODEL:-gpt-4}
-      - LLM_DEPLOYMENT_NAME=${LLM_DEPLOYMENT_NAME:-gpt-4}
+      - LLM_API_BASE=${LLM_API_BASE:-http://ollama:11434}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2:3b}
+      - LLM_DEPLOYMENT_NAME=${LLM_DEPLOYMENT_NAME:-}
     volumes:
       - ./config:/app/config:ro
     depends_on:
       mcp-server:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -68,6 +86,9 @@ services:
     depends_on:
       - orchestrator
     restart: unless-stopped
+
+volumes:
+  ollama_data:
 
 networks:
   default:

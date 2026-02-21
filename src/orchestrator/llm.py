@@ -335,6 +335,120 @@ class OpenAIProvider(LLMProvider):
             raise ValueError(f"Invalid JSON response: {e}")
 
 
+class OllamaProvider(LLMProvider):
+    """Ollama local LLM provider using LlamaIndex."""
+
+    def __init__(self, settings: LLMSettings) -> None:
+        self.settings = settings
+        self._llm = None
+
+    def _get_llm(self):
+        """Lazy initialization of LlamaIndex Ollama LLM."""
+        if self._llm is None:
+            from llama_index.llms.ollama import Ollama
+
+            self._llm = Ollama(
+                model=self.settings.model,
+                base_url=self.settings.api_base or "http://localhost:11434",
+                request_timeout=120.0,
+            )
+        return self._llm
+
+    def _convert_messages(self, messages: list[ConversationMessage]) -> list:
+        """Convert internal messages to LlamaIndex format."""
+        from llama_index.core.llms import ChatMessage, MessageRole
+
+        role_map = {
+            "user": MessageRole.USER,
+            "assistant": MessageRole.ASSISTANT,
+            "system": MessageRole.SYSTEM,
+            "tool": MessageRole.TOOL,
+        }
+        result = []
+        for msg in messages:
+            chat_msg = ChatMessage(
+                role=role_map.get(msg.role, MessageRole.USER),
+                content=msg.content,
+            )
+            if msg.tool_calls:
+                chat_msg.additional_kwargs = {"tool_calls": msg.tool_calls}
+            if msg.tool_call_id:
+                chat_msg.additional_kwargs = {"tool_call_id": msg.tool_call_id}
+            result.append(chat_msg)
+        return result
+
+    async def complete(
+        self,
+        messages: list[ConversationMessage],
+        tools: Optional[list[dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None
+    ) -> LLMResponse:
+        """Generate completion using Ollama."""
+        llm = self._get_llm()
+        chat_messages = self._convert_messages(messages)
+
+        if temperature is not None:
+            llm.temperature = temperature
+
+        try:
+            response = await llm.achat(chat_messages)
+
+            tool_calls = None
+            if hasattr(response, "tool_calls") and response.tool_calls:
+                tool_calls = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in response.tool_calls
+                ]
+
+            return LLMResponse(
+                content=response.message.content if response.message else None,
+                tool_calls=tool_calls,
+                finish_reason="tool_calls" if tool_calls else "stop",
+                usage={}
+            )
+
+        except Exception as e:
+            logger.error("LLM completion failed", error=str(e))
+            raise
+
+    async def complete_with_structured_output(
+        self,
+        messages: list[ConversationMessage],
+        output_schema: dict[str, Any],
+        temperature: Optional[float] = None
+    ) -> dict[str, Any]:
+        """Generate structured output."""
+        llm = self._get_llm()
+
+        if temperature is not None:
+            llm.temperature = temperature
+
+        try:
+            system_msg = ConversationMessage(
+                role="system",
+                content=f"Respond with valid JSON matching: {json.dumps(output_schema)}"
+            )
+            all_messages = [system_msg] + messages
+            chat_messages = self._convert_messages(all_messages)
+
+            response = await llm.achat(chat_messages)
+            content = response.message.content if response.message else "{}"
+
+            return json.loads(content)
+
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse structured output", error=str(e))
+            raise ValueError(f"Invalid JSON response: {e}")
+
+
 class MockLLMProvider(LLMProvider):
     """Mock LLM provider for testing without API calls."""
     
@@ -406,6 +520,7 @@ def create_llm_provider(settings: LLMSettings) -> LLMProvider:
     providers = {
         "azure_openai": AzureOpenAIProvider,
         "openai": OpenAIProvider,
+        "ollama": OllamaProvider,
         "mock": MockLLMProvider,
     }
     

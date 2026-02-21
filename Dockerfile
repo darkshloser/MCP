@@ -8,14 +8,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
+# Copy dependency files and source needed for install
 COPY pyproject.toml .
+COPY README.md .
+COPY src/ src/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
 
-# Copy source code
-COPY src/ src/
+# Copy remaining files
 COPY config/ config/
 
 # Create logs directory
