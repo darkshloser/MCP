@@ -15,6 +15,9 @@ llm:
   # api_base: ${LLM_API_BASE}
   # api_version: "2024-02-15-preview"
   # deployment_name: gpt-4
+  # For Ollama (default when running via docker-compose):
+  # provider: ollama
+  # model: smollm2
 
 mcp_server:
   host: "0.0.0.0"

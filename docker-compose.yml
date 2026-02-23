@@ -1,95 +1,109 @@
 version: "3.8"
 
 services:
-  # Ollama - Local LLM runtime
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2:3b && wait"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-    restart: unless-stopped
+    # Ollama - Local LLM runtime
+    ollama:
+        image: ollama/ollama:latest
+        ports:
+            - "11434:11434"
+        volumes:
+            - ollama_data:/root/.ollama
+        healthcheck:
+            test: ["CMD", "ollama", "list"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+        restart: unless-stopped
 
-  # MCP Server - Tool registry and execution
-  mcp-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["python", "-m", "mcp_server.main"]
-    ports:
-      - "8001:8001"
-    environment:
-      - MCP_ENVIRONMENT=production
-      - MCP_LOG_LEVEL=INFO
-      - MCP_SERVER_HOST=0.0.0.0
-      - MCP_SERVER_PORT=8001
-      - MCP_SERVER_REQUIRE_AUTH=false
-      - MCP_SERVER_ENABLE_AUDIT=true
-    volumes:
-      - ./config:/app/config:ro
-      - ./logs:/app/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+    # One-shot container to pull the model once Ollama is healthy
+    ollama-pull:
+        image: ollama/ollama:latest
+        volumes:
+            - ollama_data:/root/.ollama
+        entrypoint: ["/bin/sh", "-c", "ollama pull smollm2:360m"]
+        environment:
+            - OLLAMA_HOST=http://ollama:11434
+        depends_on:
+            ollama:
+                condition: service_healthy
+        restart: "no"
 
-  # Orchestrator - AI Gateway
-  orchestrator:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["python", "-m", "orchestrator.main"]
-    ports:
-      - "8000:8000"
-    environment:
-      - MCP_ENVIRONMENT=production
-      - MCP_LOG_LEVEL=INFO
-      - ORCHESTRATOR_HOST=0.0.0.0
-      - ORCHESTRATOR_PORT=8000
-      - ORCHESTRATOR_MCP_SERVER_URL=http://mcp-server:8001
-      - ORCHESTRATOR_SECRET_KEY=${ORCHESTRATOR_SECRET_KEY:-change-me}
-      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_API_BASE=${LLM_API_BASE:-http://ollama:11434}
-      - LLM_MODEL=${LLM_MODEL:-llama3.2:3b}
-      - LLM_DEPLOYMENT_NAME=${LLM_DEPLOYMENT_NAME:-}
-    volumes:
-      - ./config:/app/config:ro
-    depends_on:
-      mcp-server:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+    # MCP Server - Tool registry and execution
+    mcp-server:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        command: ["python", "-m", "mcp_server.main"]
+        ports:
+            - "8001:8001"
+        environment:
+            - MCP_ENVIRONMENT=production
+            - MCP_LOG_LEVEL=INFO
+            - MCP_SERVER_HOST=0.0.0.0
+            - MCP_SERVER_PORT=8001
+            - MCP_SERVER_REQUIRE_AUTH=false
+            - MCP_SERVER_ENABLE_AUDIT=true
+        volumes:
+            - ./config:/app/config:ro
+            - ./logs:/app/logs
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+        restart: unless-stopped
 
-  # Frontend - Chat UI
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - orchestrator
-    restart: unless-stopped
+    # Orchestrator - AI Gateway
+    orchestrator:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        command: ["python", "-m", "orchestrator.main"]
+        ports:
+            - "8000:8000"
+        environment:
+            - MCP_ENVIRONMENT=production
+            - MCP_LOG_LEVEL=INFO
+            - ORCHESTRATOR_HOST=0.0.0.0
+            - ORCHESTRATOR_PORT=8000
+            - ORCHESTRATOR_MCP_SERVER_URL=http://mcp-server:8001
+            - ORCHESTRATOR_SECRET_KEY=${ORCHESTRATOR_SECRET_KEY:-change-me}
+            - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+            - LLM_API_KEY=${LLM_API_KEY:-}
+            - LLM_API_BASE=${LLM_API_BASE:-http://ollama:11434}
+            - LLM_MODEL=${LLM_MODEL:-smollm2}
+            - LLM_DEPLOYMENT_NAME=${LLM_DEPLOYMENT_NAME:-}
+        volumes:
+            - ./config:/app/config:ro
+        depends_on:
+            mcp-server:
+                condition: service_healthy
+            ollama:
+                condition: service_healthy
+            ollama-pull:
+                condition: service_completed_successfully
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+        restart: unless-stopped
+
+    # Frontend - Chat UI
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        ports:
+            - "3000:80"
+        depends_on:
+            - orchestrator
+        restart: unless-stopped
 
 volumes:
-  ollama_data:
+    ollama_data:
 
 networks:
-  default:
-    name: mcp-network
+    default:
+        name: mcp-network

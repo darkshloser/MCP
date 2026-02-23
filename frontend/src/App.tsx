@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import api, { ChatMessage } from './services/api';
+import api from './services/api';
 
 interface Message {
   id: string;
