@@ -96,7 +96,7 @@ services:
             context: ./frontend
             dockerfile: Dockerfile
         ports:
-            - "3000:80"
+            - "${FRONTEND_PORT:-3000}:80"
         depends_on:
             - orchestrator
         restart: unless-stopped
