@@ -21,7 +21,7 @@ services:
         image: ollama/ollama:latest
         volumes:
             - ollama_data:/root/.ollama
-        entrypoint: ["/bin/sh", "-c", "ollama pull smollm2:360m"]
+        entrypoint: ["/bin/sh", "-c", "ollama pull qwen2.5:3b"]
         environment:
             - OLLAMA_HOST=http://ollama:11434
         depends_on:
@@ -72,7 +72,7 @@ services:
             - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
             - LLM_API_KEY=${LLM_API_KEY:-}
             - LLM_API_BASE=${LLM_API_BASE:-http://ollama:11434}
-            - LLM_MODEL=${LLM_MODEL:-smollm2}
+            - LLM_MODEL=${LLM_MODEL:-qwen2.5:3b}
             - LLM_DEPLOYMENT_NAME=${LLM_DEPLOYMENT_NAME:-}
         volumes:
             - ./config:/app/config:ro

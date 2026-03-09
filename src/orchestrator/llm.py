@@ -392,7 +392,10 @@ class OllamaProvider(LLMProvider):
             llm.temperature = temperature
 
         try:
-            response = await llm.achat(chat_messages)
+            if tools:
+                response = await llm.achat(chat_messages, tools=tools)
+            else:
+                response = await llm.achat(chat_messages)
 
             tool_calls = None
             if hasattr(response, "tool_calls") and response.tool_calls:
