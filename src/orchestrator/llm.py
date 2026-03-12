@@ -111,17 +111,20 @@ class AzureOpenAIProvider(LLMProvider):
                 role=role_map.get(msg.role, MessageRole.USER),
                 content=msg.content,
             )
-            
+
             # Add tool call information if present
+            kwargs: dict[str, Any] = {}
             if msg.tool_calls:
-                chat_msg.additional_kwargs = {"tool_calls": msg.tool_calls}
+                kwargs["tool_calls"] = msg.tool_calls
             if msg.tool_call_id:
-                chat_msg.additional_kwargs = {"tool_call_id": msg.tool_call_id}
-            
+                kwargs["tool_call_id"] = msg.tool_call_id
+            if kwargs:
+                chat_msg.additional_kwargs = kwargs
+
             result.append(chat_msg)
-        
+
         return result
-    
+
     async def complete(
         self,
         messages: list[ConversationMessage],
@@ -247,16 +250,20 @@ class OpenAIProvider(LLMProvider):
                 role=role_map.get(msg.role, MessageRole.USER),
                 content=msg.content,
             )
-            
+
+            kwargs: dict[str, Any] = {}
             if msg.tool_calls:
-                chat_msg.additional_kwargs = {"tool_calls": msg.tool_calls}
+                kwargs["tool_calls"] = msg.tool_calls
             if msg.tool_call_id:
-                chat_msg.additional_kwargs = {"tool_call_id": msg.tool_call_id}
-            
+                kwargs["tool_call_id"] = msg.tool_call_id
+            if kwargs:
+                chat_msg.additional_kwargs = kwargs
+
             result.append(chat_msg)
-        
+
         return result
-    
+
+
     async def complete(
         self,
         messages: list[ConversationMessage],
@@ -350,7 +357,7 @@ class OllamaProvider(LLMProvider):
             self._llm = Ollama(
                 model=self.settings.model,
                 base_url=self.settings.api_base or "http://localhost:11434",
-                request_timeout=120.0,
+                request_timeout=500.0,
             )
         return self._llm
 
@@ -370,10 +377,23 @@ class OllamaProvider(LLMProvider):
                 role=role_map.get(msg.role, MessageRole.USER),
                 content=msg.content,
             )
+            kwargs: dict[str, Any] = {}
             if msg.tool_calls:
-                chat_msg.additional_kwargs = {"tool_calls": msg.tool_calls}
+                # Ollama client validates arguments as dict, not JSON string
+                fixed_tool_calls = []
+                for tc in msg.tool_calls:
+                    tc_copy = dict(tc)
+                    func = tc_copy.get("function", {})
+                    if isinstance(func.get("arguments"), str):
+                        func = dict(func)
+                        func["arguments"] = json.loads(func["arguments"])
+                        tc_copy["function"] = func
+                    fixed_tool_calls.append(tc_copy)
+                kwargs["tool_calls"] = fixed_tool_calls
             if msg.tool_call_id:
-                chat_msg.additional_kwargs = {"tool_call_id": msg.tool_call_id}
+                kwargs["tool_call_id"] = msg.tool_call_id
+            if kwargs:
+                chat_msg.additional_kwargs = kwargs
             result.append(chat_msg)
         return result
 
@@ -397,22 +417,39 @@ class OllamaProvider(LLMProvider):
             else:
                 response = await llm.achat(chat_messages)
 
+            # LlamaIndex Ollama returns tool calls as ToolCallBlock
+            # objects inside response.message.blocks, not as
+            # response.tool_calls.
+            from llama_index.core.base.llms.types import ToolCallBlock
+
+            raw_content = response.message.content if response.message else None
+            blocks = getattr(response.message, "blocks", []) if response.message else []
+            tool_call_blocks = [b for b in blocks if isinstance(b, ToolCallBlock)]
+
+            logger.debug(
+                "Ollama raw response",
+                tool_call_count=len(tool_call_blocks),
+                content_preview=(raw_content or "")[:200],
+            )
+
             tool_calls = None
-            if hasattr(response, "tool_calls") and response.tool_calls:
+            if tool_call_blocks:
                 tool_calls = [
                     {
-                        "id": tc.id,
+                        "id": tc.tool_call_id or f"call_{i}",
                         "type": "function",
                         "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
+                            "name": tc.tool_name,
+                            "arguments": json.dumps(tc.tool_kwargs)
+                                if isinstance(tc.tool_kwargs, dict)
+                                else tc.tool_kwargs,
                         }
                     }
-                    for tc in response.tool_calls
+                    for i, tc in enumerate(tool_call_blocks)
                 ]
 
             return LLMResponse(
-                content=response.message.content if response.message else None,
+                content=raw_content,
                 tool_calls=tool_calls,
                 finish_reason="tool_calls" if tool_calls else "stop",
                 usage={}

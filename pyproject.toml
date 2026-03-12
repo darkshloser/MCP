@@ -54,6 +54,10 @@ dependencies = [
     "structlog>=24.1.0",
     "tenacity>=8.2.0",
     "jsonschema>=4.21.0",
+
+    # Web Scraping
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
 ]
 
 [project.optional-dependencies]

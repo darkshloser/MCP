@@ -213,4 +213,4 @@ class DomainConfig(BaseModel):
     timeout_seconds: int = 30
     
     # Feature flags
-    features: dict[str, bool] = Field(default_factory=dict)
+    features: dict[str, Any] = Field(default_factory=dict)

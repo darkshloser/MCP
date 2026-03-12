@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
     # Initialize MCP client
     mcp_client = MCPClient(
         server_url=_settings.orchestrator.mcp_server_url,
-        timeout=30.0
+        timeout=500.0
     )
     
     # Initialize conversation manager

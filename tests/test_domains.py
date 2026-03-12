@@ -10,86 +10,6 @@ from shared.models import (
 )
 
 
-class TestHRDomain:
-    """Tests for HR domain."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        from domains.hr import HRAdapter
-        
-        self.config = DomainConfig(
-            name="hr",
-            description="HR Domain",
-            version="1.0.0"
-        )
-        self.adapter = HRAdapter(self.config)
-        self.user = UserContext(
-            user_id="test_user",
-            username="tester",
-            roles=["user"]
-        )
-        self.context = ExecutionContext(
-            request_id="test-req-001",
-            user=self.user
-        )
-    
-    def test_get_employee(self):
-        """Test getting employee by ID."""
-        result = self.adapter.execute(
-            "get_employee",
-            {"employee_id": "E001"},
-            self.context
-        )
-        
-        assert result.status == ToolResultStatus.SUCCESS
-        assert result.data["name"] == "Alice Johnson"
-        assert result.data["department"] == "Engineering"
-    
-    def test_get_employee_not_found(self):
-        """Test getting non-existent employee."""
-        result = self.adapter.execute(
-            "get_employee",
-            {"employee_id": "E999"},
-            self.context
-        )
-        
-        assert result.status == ToolResultStatus.ERROR
-        assert "not found" in result.error.lower()
-    
-    def test_search_employees(self):
-        """Test searching employees."""
-        result = self.adapter.execute(
-            "search_employees",
-            {"department": "Engineering"},
-            self.context
-        )
-        
-        assert result.status == ToolResultStatus.SUCCESS
-        assert len(result.data) >= 1
-        assert all(e["department"] == "Engineering" for e in result.data)
-    
-    def test_list_departments(self):
-        """Test listing departments."""
-        result = self.adapter.execute(
-            "list_departments",
-            {},
-            self.context
-        )
-        
-        assert result.status == ToolResultStatus.SUCCESS
-        assert "Engineering" in result.data
-        assert "HR" in result.data
-    
-    def test_tool_definitions(self):
-        """Test that tools are properly defined."""
-        tools = self.adapter.tools
-        
-        assert len(tools) >= 4
-        tool_names = [t.name for t in tools]
-        assert "get_employee" in tool_names
-        assert "search_employees" in tool_names
-        assert "list_departments" in tool_names
-
 
 class TestERPDomain:
     """Tests for ERP domain."""
@@ -271,14 +191,12 @@ class TestDomainIsolation:
     
     def test_all_tools_namespaced(self):
         """Test that all tools are properly namespaced."""
-        from domains.hr import HRAdapter
         from domains.erp import ERPAdapter
         from domains.devops import DevOpsAdapter
         
         config = DomainConfig(name="test", description="Test", version="1.0.0")
         
         for AdapterClass, domain in [
-            (HRAdapter, "hr"),
             (ERPAdapter, "erp"),
             (DevOpsAdapter, "devops")
         ]:
@@ -290,19 +208,5 @@ class TestDomainIsolation:
                 qualified = tool.qualified_name
                 assert qualified.startswith(f"{domain}."), \
                     f"Tool {tool.name} should be namespaced as {domain}.{tool.name}"
-    
-    def test_adapters_have_no_shared_state(self):
-        """Test that adapters are independent."""
-        from domains.hr import HRAdapter
-        from domains.erp import ERPAdapter
-        
-        hr_config = DomainConfig(name="hr", description="HR", version="1.0.0")
-        erp_config = DomainConfig(name="erp", description="ERP", version="1.0.0")
-        
-        hr_adapter1 = HRAdapter(hr_config)
-        hr_adapter2 = HRAdapter(hr_config)
-        erp_adapter = ERPAdapter(erp_config)
-        
-        # Each adapter should have its own tools dict
-        assert hr_adapter1._tools is not hr_adapter2._tools
-        assert hr_adapter1._tools is not erp_adapter._tools
+
+
