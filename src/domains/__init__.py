@@ -22,12 +22,12 @@ def load_all_domains(router: "AsyncToolRouter") -> None:
     This is called at MCP Server startup to register all
     domain tools and adapters.
     """
-    from domains.hr import register_hr_domain
+    from domains.stock_analysis import register_stock_analysis_domain
     from domains.erp import register_erp_domain
     from domains.devops import register_devops_domain
-    
+
     # Register each domain
-    register_hr_domain(router)
+    register_stock_analysis_domain(router)
     register_erp_domain(router)
     register_devops_domain(router)
 

@@ -5,12 +5,18 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://orchestrator:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
+    },
+    hmr: {
+      host: 'localhost',
+      port: 3000,
+      protocol: 'ws'
     }
   }
 })

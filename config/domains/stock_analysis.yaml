@@ -1,0 +1,18 @@
+# Stock Analysis Domain Configuration
+
+name: stock_analysis
+description: Stock Analysis domain for live news scraping from stockanalysis.com
+version: "1.0.0"
+enabled: true
+
+# External source
+base_url: https://stockanalysis.com
+
+# Rate limiting (be conservative with external scraping)
+rate_limit_rpm: 12
+timeout_seconds: 30
+
+# Feature flags
+features:
+  cache_ttl_seconds: 300
+  max_items: 50
